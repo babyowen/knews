@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { CalendarDaysIcon, MagnifyingGlassIcon, NewspaperIcon } from "@heroicons/react/24/outline";
 import { getTenantAccessToken, fetchKeywords, fetchNewsSummaries } from './utils/api';
 import ReactMarkdown from 'react-markdown';
+
+interface NewsItem {
+  keyword: string;
+  summary: string;
+  date: string;
+}
 
 export default function Home() {
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -14,10 +20,10 @@ export default function Home() {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const [summaries, setSummaries] = useState<Array<{ keyword: string; summary: string }>>([]);
+  const [summaries, setSummaries] = useState<NewsItem[]>([]);
   const [isLoadingSummaries, setIsLoadingSummaries] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadKeywords() {
@@ -26,30 +32,36 @@ export default function Home() {
       const appToken = process.env.NEXT_PUBLIC_APP_TOKEN;
       const tableId = process.env.NEXT_PUBLIC_TABLE_ID;
 
-      console.log("Environment variables check:");
-      console.log("APP_ID:", appId);
-      console.log("APP_SECRET:", appSecret?.substring(0, 4) + "****");
-      console.log("APP_TOKEN:", appToken);
-      console.log("TABLE_ID:", tableId);
+      console.log("Environment variables check:", {
+        appId: appId ? `${appId.substring(0, 4)}...` : 'missing',
+        appSecret: appSecret ? `${appSecret.substring(0, 4)}...` : 'missing',
+        appToken: appToken ? `${appToken.substring(0, 4)}...` : 'missing',
+        tableId: tableId || 'missing'
+      });
 
       if (appId && appSecret && appToken && tableId) {
         try {
+          console.log("Starting to fetch tenant access token...");
           const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
           console.log("Got tenant access token:", tenantAccessToken.substring(0, 4) + "****");
           
+          console.log("Starting to fetch keywords...");
           const fetchedKeywords = await fetchKeywords(tenantAccessToken, appToken, tableId);
-          console.log("Fetched unique keywords:", fetchedKeywords);
+          console.log("Fetched keywords:", fetchedKeywords);
           
           if (Array.isArray(fetchedKeywords) && fetchedKeywords.length > 0) {
+            console.log("Sorting keywords...");
             const sortedKeywords = [...fetchedKeywords].sort();
             setKeywords(sortedKeywords);
+            console.log("Keywords set successfully:", sortedKeywords);
           } else {
-            console.warn("No keywords found");
+            console.warn("No keywords found in response");
             setKeywords([]);
           }
         } catch (error) {
+          console.error("Error in loadKeywords:", error);
           if (error instanceof Error) {
-            console.error("Detailed error in loadKeywords:", {
+            console.error("Error details:", {
               message: error.message,
               stack: error.stack
             });
