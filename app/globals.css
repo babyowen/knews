@@ -2,6 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 添加Markdown样式 */
+.prose {
+  @apply text-gray-300;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  @apply text-gray-100;
+}
+
+.prose a {
+  @apply text-blue-400 hover:text-blue-300;
+}
+
+.prose strong {
+  @apply text-gray-100;
+}
+
+.prose ul, .prose ol {
+  @apply my-4 list-disc list-inside;
+}
+
+.prose li {
+  @apply my-1;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-gray-700 pl-4 italic;
+}
+
+.prose code {
+  @apply bg-gray-800 px-1 rounded;
+}
+
+.prose pre {
+  @apply bg-gray-800 p-4 rounded-lg overflow-x-auto;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
