@@ -1,14 +1,4 @@
-interface FeishuResponse {
-  code: number;
-  msg: string;
-  data: {
-    items: Array<{
-      fields: {
-        keyword: string;
-      };
-    }>;
-  };
-}
+import { FeishuRecord, FeishuResponse } from '@/app/types/feishu';
 
 interface NewsItem {
   keyword: string;
@@ -84,9 +74,9 @@ export async function fetchKeywords(tenantAccessToken: string, appToken: string,
       throw new Error('No items found in response');
     }
     
-    // 获取所有关键词并去重
-    const keywords = data.data.items.map(item => item.fields.keyword);
-    const uniqueKeywords = Array.from(new Set(keywords));
+    // 明确指定 item 的类型
+    const keywords = data.data.items.map((item: FeishuRecord) => item.fields.keyword);
+    const uniqueKeywords = Array.from(new Set(keywords)) as string[];
     return uniqueKeywords;
   } catch (error) {
     if (error instanceof Error) {
@@ -135,10 +125,10 @@ export async function fetchNewsSummaries(
       return [];
     }
     
-    return data.data.items.map((item: any) => ({
+    return data.data.items.map((item: FeishuRecord) => ({
       keyword: item.fields.keyword || '',
       summary: item.fields.summary || '',
-      date: item.fields.update || '',  // 使用update字段作为日期
+      date: item.fields.update || '',
     }));
   } catch (error) {
     console.error("Error in fetchNewsSummaries:", error);

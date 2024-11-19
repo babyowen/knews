@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { FeishuRecord, FeishuResponse } from '@/app/types/feishu';
 
 export async function POST(request: Request) {
   try {
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
       
       // 在后端进行数据过滤
       if (result.data?.items) {
-        const filteredItems = result.data.items.filter((item: any) => {
+        const filteredItems = result.data.items.filter((item: FeishuRecord) => {
           const itemDate = item.fields.date;
           const itemKeyword = item.fields.keyword;
 
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
 
         console.log("API Route - Filtered items count:", filteredItems.length);
         if (filteredItems.length > 0) {
-          console.log("API Route - Matched items:", filteredItems.map((item: any) => ({
+          console.log("API Route - Matched items:", filteredItems.map((item: FeishuRecord) => ({
             keyword: item.fields.keyword,
             date: item.fields.date,
             summaryPreview: item.fields.summary?.substring(0, 50) + "..."
