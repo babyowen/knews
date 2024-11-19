@@ -7,19 +7,29 @@ export async function POST(request: Request) {
     console.log("API Route - Received request type:", type);
 
     if (type === 'token') {
-      const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          app_id: process.env.NEXT_PUBLIC_APP_ID,
-          app_secret: process.env.NEXT_PUBLIC_APP_SECRET,
-        }),
-      });
+      try {
+        console.log("API Route - Fetching tenant access token...");
+        const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            app_id: data.app_id,
+            app_secret: data.app_secret
+          }),
+        });
 
-      const result = await response.json();
-      return NextResponse.json(result);
+        const result = await response.json();
+        console.log("API Route - Token response status:", response.status);
+        return NextResponse.json(result);
+      } catch (error) {
+        console.error("API Route - Token error:", error);
+        return NextResponse.json({ 
+          error: 'Failed to get token',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
+      }
     }
 
     if (type === 'keywords') {
