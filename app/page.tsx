@@ -26,6 +26,13 @@ export default function Home() {
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    console.log("Environment variables status:", {
+      APP_ID: process.env.NEXT_PUBLIC_APP_ID ? "exists" : "missing",
+      APP_SECRET: process.env.NEXT_PUBLIC_APP_SECRET ? "exists" : "missing",
+      APP_TOKEN: process.env.NEXT_PUBLIC_APP_TOKEN ? "exists" : "missing",
+      TABLE_ID: process.env.NEXT_PUBLIC_TABLE_ID ? "exists" : "missing",
+    });
+    
     async function loadKeywords() {
       const appId = process.env.NEXT_PUBLIC_APP_ID;
       const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
