@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { CalendarDaysIcon, MagnifyingGlassIcon, NewspaperIcon } from "@heroicons/react/24/outline";
-import { getTenantAccessToken, fetchKeywords, fetchNewsSummaries } from './utils/api';
+import { getTenantAccessToken, fetchKeywords, fetchNewsSummaries, fetchNewsLinks } from './utils/api';
 import ReactMarkdown from 'react-markdown';
 
 interface NewsItem {
   keyword: string;
   summary: string;
   date: string;
+  links?: { title: string; link: string }[];
 }
 
 export default function Home() {
@@ -26,53 +27,19 @@ export default function Home() {
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    console.log("Environment variables status:", {
-      APP_ID: process.env.NEXT_PUBLIC_APP_ID ? "exists" : "missing",
-      APP_SECRET: process.env.NEXT_PUBLIC_APP_SECRET ? "exists" : "missing",
-      APP_TOKEN: process.env.NEXT_PUBLIC_APP_TOKEN ? "exists" : "missing",
-      TABLE_ID: process.env.NEXT_PUBLIC_TABLE_ID ? "exists" : "missing",
-    });
-    
     async function loadKeywords() {
       const appId = process.env.NEXT_PUBLIC_APP_ID;
       const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
       const appToken = process.env.NEXT_PUBLIC_APP_TOKEN;
       const tableId = process.env.NEXT_PUBLIC_TABLE_ID;
 
-      console.log("Environment variables check:", {
-        appId: appId ? `${appId.substring(0, 4)}...` : 'missing',
-        appSecret: appSecret ? `${appSecret.substring(0, 4)}...` : 'missing',
-        appToken: appToken ? `${appToken.substring(0, 4)}...` : 'missing',
-        tableId: tableId || 'missing'
-      });
-
       if (appId && appSecret && appToken && tableId) {
         try {
-          console.log("Starting to fetch tenant access token...");
           const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
-          console.log("Got tenant access token:", tenantAccessToken.substring(0, 4) + "****");
-          
-          console.log("Starting to fetch keywords...");
           const fetchedKeywords = await fetchKeywords(tenantAccessToken, appToken, tableId);
-          console.log("Fetched keywords:", fetchedKeywords);
-          
-          if (Array.isArray(fetchedKeywords) && fetchedKeywords.length > 0) {
-            console.log("Sorting keywords...");
-            const sortedKeywords = [...fetchedKeywords].sort();
-            setKeywords(sortedKeywords);
-            console.log("Keywords set successfully:", sortedKeywords);
-          } else {
-            console.warn("No keywords found in response");
-            setKeywords([]);
-          }
+          setKeywords(fetchedKeywords);
         } catch (error) {
           console.error("Error in loadKeywords:", error);
-          if (error instanceof Error) {
-            console.error("Error details:", {
-              message: error.message,
-              stack: error.stack
-            });
-          }
           setKeywords([]);
         } finally {
           setIsLoading(false);
@@ -94,6 +61,12 @@ export default function Home() {
   };
 
   const handleSearch = async () => {
+    console.log("Search function triggered");
+    console.log("handleSearch triggered with:", {
+      selectedKeywords,
+      selectedDate: selectedDate.toISOString().split('T')[0]
+    });
+
     if (selectedKeywords.length === 0) {
       alert("请至少选择一个关键词");
       return;
@@ -106,21 +79,76 @@ export default function Home() {
       const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
       const appToken = process.env.NEXT_PUBLIC_APP_TOKEN;
       const tableId = process.env.NEXT_PUBLIC_TABLE_ID;
+      const localTableId = process.env.LOCAL_TABLE_ID;
 
-      if (appId && appSecret && appToken && tableId) {
+      console.log("Environment variables check:", {
+        hasAppId: !!appId,
+        hasAppSecret: !!appSecret,
+        hasAppToken: !!appToken,
+        hasTableId: !!tableId,
+        hasLocalTableId: !!localTableId
+      });
+
+      if (appId && appSecret && appToken && tableId && localTableId) {
+        // 1. 获取 token
+        console.log("Getting tenant access token...");
         const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
+        console.log("Got tenant access token");
+
+        // 2. 获取新闻总结
+        const searchDate = selectedDate.toISOString().split('T')[0];
+        console.log("Fetching summaries with:", {
+          date: searchDate,
+          keywords: selectedKeywords
+        });
+
         const fetchedSummaries = await fetchNewsSummaries(
           tenantAccessToken,
           appToken,
           tableId,
-          selectedDate.toISOString().split('T')[0],
+          searchDate,
           selectedKeywords
         );
 
-        setSummaries(fetchedSummaries);
+        console.log("Fetched Summaries:", fetchedSummaries);
+
+        if (fetchedSummaries.length === 0) {
+          console.log("No summaries found");
+          setSummaries([]);
+          return;
+        }
+
+        // 3. 获取新闻链接
+        console.log("Fetching links...");
+        const fetchedLinks = await fetchNewsLinks(
+          tenantAccessToken,
+          appToken,
+          localTableId,
+          searchDate,
+          selectedKeywords
+        );
+
+        console.log("Fetched Links:", fetchedLinks);
+
+        // 4. 合并新闻总结和链接
+        const combinedSummaries = fetchedSummaries.map(summary => {
+          const summaryLinks = fetchedLinks.filter(link => link.keyword === summary.keyword);
+          console.log(`Links for keyword ${summary.keyword}:`, summaryLinks);
+          return {
+            ...summary,
+            links: summaryLinks
+          };
+        });
+
+        console.log("Final combined summaries:", combinedSummaries);
+
+        setSummaries(combinedSummaries);
+      } else {
+        console.error("Missing required environment variables");
+        throw new Error("Missing required environment variables");
       }
     } catch (error) {
-      console.error("Error fetching summaries:", error);
+      console.error("Error in handleSearch:", error);
       setSummaries([]);
     } finally {
       setIsLoadingSummaries(false);
@@ -246,7 +274,11 @@ export default function Home() {
             className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg 
                      hover:shadow-lg hover:scale-105 transition transform flex items-center justify-center gap-2 
                      focus:outline-none focus:ring-2 focus:ring-purple-500"
-            onClick={handleSearch}
+            onClick={() => {
+              console.log("Search button clicked");
+              handleSearch();
+            }}
+            type="button"
           >
             <MagnifyingGlassIcon className="h-5 w-5" /> 查找
           </button>
@@ -272,6 +304,17 @@ export default function Home() {
                   </h3>
                   <div className="prose prose-invert max-w-none">
                     <ReactMarkdown>{item.summary}</ReactMarkdown>
+                    {item.links && item.links.length > 0 && (
+                      <ul className="mt-2">
+                        {item.links.map((link, linkIndex) => (
+                          <li key={linkIndex}>
+                            <a href={link.link} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
+                              {link.title}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               ))}

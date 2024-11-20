@@ -94,44 +94,140 @@ export async function fetchNewsSummaries(
   date: string,
   keywords: string[]
 ): Promise<NewsItem[]> {
-  console.log("Fetching news summaries...", { date, keywords });
+  console.log("fetchNewsSummaries called with:", {
+    hasToken: !!tenantAccessToken,
+    appToken,
+    tableId,
+    date,
+    keywords
+  });
+
   try {
+    const formattedDate = date.replace(/-/g, '/');
+    console.log("Formatted date:", formattedDate);
+
+    const requestBody = {
+      type: 'summaries',
+      token: tenantAccessToken,
+      appToken,
+      tableId,
+      date: formattedDate,
+      keywords,
+    };
+
+    console.log("Making request with body:", requestBody);
+
+    const response = await fetch('/api/feishu', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response for summaries:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Raw summaries response:", data);
+    
+    if (data.error) {
+      console.error("API returned error:", data.error);
+      throw new Error(data.error);
+    }
+
+    if (!data.data?.items) {
+      console.log("No summaries found for the given criteria");
+      return [];
+    }
+    
+    const summaries = data.data.items.map((item: any) => {
+      console.log("Processing summary item:", item.fields);
+      return {
+        keyword: item.fields.keyword || '',
+        summary: item.fields.summary || '',
+        date: item.fields.date || '',  // 注意这里使用 date 而不是 update
+      };
+    });
+
+    console.log("Processed summaries:", summaries);
+    return summaries;
+  } catch (error) {
+    console.error("Error in fetchNewsSummaries:", error);
+    throw error;
+  }
+}
+
+// 获取新闻链接的函数
+export async function fetchNewsLinks(
+  tenantAccessToken: string,
+  appToken: string,
+  localTableId: string,
+  date: string,
+  keywords: string[]
+): Promise<{ keyword: string; title: string; link: string }[]> {
+  console.log("Fetching news links with params:", { 
+    token: tenantAccessToken ? 'exists' : 'missing',
+    appToken,
+    localTableId,
+    date,
+    keywords
+  });
+
+  try {
+    // 确保日期格式正确（将 - 转换为 /）
+    const formattedDate = date.replace(/-/g, '/');
+
     const response = await fetch('/api/feishu', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        type: 'summaries',
+        type: 'links',
         token: tenantAccessToken,
         appToken,
-        tableId,
-        date,
+        tableId: localTableId,
+        date: formattedDate,  // 使用格式化后的日期
         keywords,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("API Error Response:", errorText);
+      console.error("API Error Response for links:", errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Summaries response:", data);
-    
+    console.log("Raw links response:", data);
+
+    if (data.error) {
+      console.error("API returned error:", data.error);
+      throw new Error(data.error);
+    }
+
     if (!data.data?.items) {
-      console.log("No summaries found for the given criteria");
+      console.log("No links found for the given criteria");
       return [];
     }
-    
-    return data.data.items.map((item: FeishuRecord) => ({
-      keyword: item.fields.keyword || '',
-      summary: item.fields.summary || '',
-      date: item.fields.update || '',
-    }));
+
+    const links = data.data.items.map((item: any) => {
+      console.log("Processing link item:", item.fields);
+      return {
+        keyword: item.fields.keyword || '',
+        title: item.fields.title || '',
+        link: item.fields.link || '',
+      };
+    });
+
+    console.log("Processed links:", links);
+    return links;
   } catch (error) {
-    console.error("Error in fetchNewsSummaries:", error);
+    console.error("Error in fetchNewsLinks:", error);
     throw error;
   }
 } 

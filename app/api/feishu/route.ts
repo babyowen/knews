@@ -1,55 +1,62 @@
 import { NextResponse } from 'next/server';
-import { FeishuRecord, FeishuResponse } from '@/app/types/feishu';
+import { FeishuRecord } from '@/app/types/feishu';
 
 export async function POST(request: Request) {
   try {
-    const { type, ...data } = await request.json();
-    console.log("API Route - Received request type:", type);
+    const body = await request.json();
+    const { type, token, appToken, tableId, date, keywords } = body;
 
+    console.log("API Route - Received request:", {
+      type,
+      token: token ? 'exists' : 'missing',
+      appToken: appToken ? 'exists' : 'missing',
+      tableId,
+      date,
+      keywords
+    });
+
+    // 处理获取 tenant_access_token 的请求
     if (type === 'token') {
-      const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal/', {
+      const { app_id, app_secret } = body;
+      console.log("API Route - Token request with:", {
+        app_id: app_id ? 'exists' : 'missing',
+        app_secret: app_secret ? 'exists' : 'missing'
+      });
+
+      const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          app_id: process.env.NEXT_PUBLIC_APP_ID,
-          app_secret: process.env.NEXT_PUBLIC_APP_SECRET,
+          app_id,
+          app_secret,
         }),
       });
 
-      const result = await response.json();
-      return NextResponse.json(result);
-    }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Route - Token error response:", errorText);
+        throw new Error(`Feishu API error: ${response.status}`);
+      }
 
-    if (type === 'keywords') {
-      const { token, appToken, tableId } = data;
-      const response = await fetch(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-      return NextResponse.json(result);
-    }
-
-    if (type === 'summaries') {
-      const { token, appToken, tableId, date, keywords } = data;
-      console.log("API Route - Querying summaries with:", { 
-        date, 
-        keywords,
-        appToken: appToken.substring(0, 4) + "****",
-        tableId 
+      const data = await response.json();
+      console.log("API Route - Token response:", {
+        code: data.code,
+        msg: data.msg,
+        tenant_access_token: data.tenant_access_token ? 'exists' : 'missing'
       });
-      
-      // 使用与获取关键词相同的API端点
-      console.log("API Route - Fetching from Feishu API...");
+      return NextResponse.json(data);
+    }
+
+    // 处理获取关键词的请求
+    if (type === 'keywords') {
+      console.log("API Route - Fetching keywords with:", {
+        token: token ? 'exists' : 'missing',
+        appToken,
+        tableId
+      });
+
       const response = await fetch(
         `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
         {
@@ -63,20 +70,137 @@ export async function POST(request: Request) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("API Route - Feishu API Error Response:", errorText);
+        console.error("API Route - Keywords error response:", errorText);
+        throw new Error(`Feishu API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("API Route - Keywords response:", {
+        total: data.data?.items?.length || 0
+      });
+      return NextResponse.json(data);
+    }
+
+    // 处理获取新闻总结的请求
+    if (type === 'summaries') {
+      console.log("API Route - Fetching summaries with:", {
+        token: token ? 'exists' : 'missing',
+        appToken,
+        tableId,
+        date,
+        keywords
+      });
+
+      if (!token || !appToken || !tableId || !date || !keywords) {
+        throw new Error('Missing required parameters for summaries request');
+      }
+
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Route - Summaries error response:", errorText);
         throw new Error(`Feishu API error: ${response.status}`);
       }
 
       const result = await response.json();
       console.log("API Route - Total records received:", result.data?.items?.length || 0);
       
-      // 在后端进行数据过滤
+      if (result.data?.items) {
+        const filteredItems = result.data.items.filter((item: FeishuRecord) => {
+          const itemDate = item.fields.date;
+          const itemKeyword = item.fields.keyword;
+          const itemSummary = item.fields.summary;
+
+          console.log("API Route - Raw item fields:", item.fields);
+
+          let formattedItemDate = '';
+          if (typeof itemDate === 'number') {
+            const itemDateObj = new Date(itemDate);
+            formattedItemDate = `${itemDateObj.getFullYear()}/${(itemDateObj.getMonth() + 1).toString().padStart(2, '0')}/${itemDateObj.getDate().toString().padStart(2, '0')}`;
+          } else if (typeof itemDate === 'string') {
+            formattedItemDate = itemDate.replace(/-/g, '/');
+          }
+
+          const formattedInputDate = date.replace(/-/g, '/');
+          const matchDate = formattedItemDate === formattedInputDate;
+          const matchKeyword = keywords.includes(itemKeyword);
+
+          console.log("API Route - Checking summary item:", {
+            itemDate: formattedItemDate,
+            inputDate: formattedInputDate,
+            itemKeyword,
+            matchDate,
+            matchKeyword,
+            hasSummary: !!itemSummary
+          });
+
+          return matchDate && matchKeyword && itemSummary;
+        });
+
+        console.log("API Route - Filtered summaries:", {
+          total: filteredItems.length,
+          items: filteredItems.map(item => ({
+            keyword: item.fields.keyword,
+            date: item.fields.date,
+            hasSummary: !!item.fields.summary
+          }))
+        });
+
+        return NextResponse.json({ data: { items: filteredItems } });
+      }
+
+      return NextResponse.json({ data: { items: [] } });
+    }
+
+    // 处理获取新闻链接的请求
+    if (type === 'links') {
+      console.log("API Route - Fetching links with:", {
+        token: token ? 'exists' : 'missing',
+        appToken,
+        tableId,
+        date,
+        keywords
+      });
+
+      if (!token || !appToken || !tableId || !date || !keywords) {
+        throw new Error('Missing required parameters for links request');
+      }
+
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Route - Links error response:", errorText);
+        throw new Error(`Feishu API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("API Route - Total link records received:", result.data?.items?.length || 0);
+      
       if (result.data?.items) {
         const filteredItems = result.data.items.filter((item: FeishuRecord) => {
           const itemDate = item.fields.date;
           const itemKeyword = item.fields.keyword;
 
-          // 将日期字符串转换为标准格式
           let formattedItemDate = '';
           if (typeof itemDate === 'number') {
             const date = new Date(itemDate);
@@ -89,49 +213,29 @@ export async function POST(request: Request) {
           const matchDate = formattedItemDate === formattedInputDate;
           const matchKeyword = keywords.includes(itemKeyword);
 
-          // 只记录匹配日期或关键词的项
-          if (matchDate || matchKeyword) {
-            console.log("API Route - Checking matching/partial-matching item:", { 
-              itemDate: formattedItemDate, 
-              inputDate: formattedInputDate,
-              itemKeyword,
-              matchDate,
-              matchKeyword
-            });
-          }
+          console.log("API Route - Checking link item:", {
+            itemDate: formattedItemDate,
+            inputDate: formattedInputDate,
+            itemKeyword,
+            matchDate,
+            matchKeyword
+          });
 
           return matchDate && matchKeyword;
         });
 
-        console.log("API Route - Filtered items count:", filteredItems.length);
-        if (filteredItems.length > 0) {
-          console.log("API Route - Matched items:", filteredItems.map((item: FeishuRecord) => ({
-            keyword: item.fields.keyword,
-            date: item.fields.date,
-            summaryPreview: item.fields.summary?.substring(0, 50) + "..."
-          })));
-        } else {
-          console.log("API Route - No matching items found");
-        }
-
-        return NextResponse.json({
-          code: result.code,
-          msg: result.msg,
-          data: {
-            items: filteredItems
-          }
-        });
+        console.log("API Route - Filtered links:", filteredItems.length);
+        return NextResponse.json({ data: { items: filteredItems } });
       }
 
-      return NextResponse.json(result);
+      return NextResponse.json({ data: { items: [] } });
     }
 
-    return NextResponse.json({ error: 'Invalid request type' }, { status: 400 });
+    throw new Error(`Unknown request type: ${type}`);
   } catch (error) {
-    console.error('API Route - Error:', error);
+    console.error("API Route - Error:", error);
     return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Internal Server Error' 
     }, { status: 500 });
   }
 } 
