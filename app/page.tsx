@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { CalendarDaysIcon, MagnifyingGlassIcon, NewspaperIcon } from "@heroicons/react/24/outline";
 import { getTenantAccessToken, fetchKeywords, fetchNewsSummaries } from './utils/api';
 import ReactMarkdown from 'react-markdown';
+import NewsCard from './components/NewsCard';
 
 interface NewsItem {
   keyword: string;
@@ -265,16 +266,24 @@ export default function Home() {
             </div>
           ) : summaries.length > 0 ? (
             <div className="space-y-6">
-              {summaries.map((item, index) => (
-                <div key={index} className="bg-gray-800/50 rounded-lg p-4">
-                  <h3 className="text-xl font-semibold text-blue-400 mb-2">
-                    {item.keyword}
-                  </h3>
-                  <div className="prose prose-invert max-w-none">
-                    <ReactMarkdown>{item.summary}</ReactMarkdown>
-                  </div>
-                </div>
-              ))}
+              {summaries.map((item, index) => {
+                const formattedDate = new Date(item.date).toLocaleDateString('zh-CN', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit'
+                });
+                
+                return (
+                  <NewsCard
+                    key={index}
+                    title={item.keyword}
+                    url=""
+                    summary={item.summary}
+                    keywords={[item.keyword]}
+                    date={formattedDate}
+                  />
+                );
+              })}
             </div>
           ) : hasSearched ? (
             <div className="flex flex-col items-center justify-center text-gray-400 p-8">
