@@ -16,81 +16,46 @@ function cleanTextForSpeech(text: string): string {
     .trim();
 }
 
-// 将长文本分割成较短的片段
-function splitTextIntoChunks(text: string, maxLength: number = 4096): string[] {
-  const chunks: string[] = [];
-  let currentChunk = '';
-  
-  // 按句号分割文本
-  const sentences = text.split('。');
-  
-  for (const sentence of sentences) {
-    if ((currentChunk + sentence).length <= maxLength) {
-      currentChunk += sentence + '。';
-    } else {
-      if (currentChunk) chunks.push(currentChunk);
-      currentChunk = sentence + '。';
-    }
-  }
-  
-  if (currentChunk) chunks.push(currentChunk);
-  console.log('文本分段结果:', chunks.length, '个片段');
-  return chunks;
-}
-
-export async function synthesizeSpeech(text: string, voice: string): Promise<void> {
+export async function synthesizeSpeech(text: string): Promise<void> {
   try {
+    // 检查浏览器是否支持语音合成
+    if (!window.speechSynthesis) {
+      throw new Error('您的浏览器不支持语音合成功能');
+    }
+
     // 清理文本
     const cleanedText = cleanTextForSpeech(text);
     console.log('清理后的文本:', cleanedText);
 
-    // 分割文本
-    const textChunks = splitTextIntoChunks(cleanedText);
-    console.log(`准备播放 ${textChunks.length} 个文本片段`);
-
-    // 创建音频上下文
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-    // 顺序播放每个文本片段
-    for (let i = 0; i < textChunks.length; i++) {
-      const chunk = textChunks[i];
-      console.log(`开始处理第 ${i + 1}/${textChunks.length} 个片段...`);
-
-      // 调用我们的 API 获取音频
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: chunk, voice }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      // 获取音频数据并播放
-      const audioData = await response.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(audioData);
-      
-      await new Promise<void>((resolve) => {
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        source.onended = () => resolve();
-        // 移除 onerror 处理，改用 try-catch
-        try {
-          source.start(0);
-        } catch (error) {
-          console.error('音频播放失败:', error);
-          throw error;
-        }
-      });
-
-      console.log(`第 ${i + 1} 个片段播放完成`);
-    }
+    // 创建语音合成实例
+    const utterance = new SpeechSynthesisUtterance(cleanedText);
     
-    console.log('所有文本片段播放完成');
+    // 设置语音参数
+    utterance.lang = 'zh-CN';  // 设置语言为中文
+    utterance.rate = 1;        // 语速 (0.1 到 10)
+    utterance.pitch = 1;       // 音高 (0 到 2)
+    utterance.volume = 1;      // 音量 (0 到 1)
+
+    // 播放语音
+    return new Promise((resolve, reject) => {
+      utterance.onend = () => {
+        console.log('语音播放完成');
+        resolve();
+      };
+
+      utterance.onerror = (event) => {
+        // 如果是被主动中断的，不视为错误
+        if (event.error === 'interrupted') {
+          console.log('语音播放被中断');
+          resolve();
+        } else {
+          console.error('语音播放错误:', event);
+          reject(new Error('语音播放失败'));
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+    });
   } catch (error) {
     console.error('语音合成失败:', error);
     throw error;

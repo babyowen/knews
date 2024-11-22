@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import WebSocket from 'ws';
+import WebSocket from 'isomorphic-ws';
 
 export async function POST(request: Request) {
   try {
@@ -25,29 +25,24 @@ export async function POST(request: Request) {
 
     try {
       const audioData = await new Promise<Buffer>((resolve, reject) => {
-        // 添加必要的请求头
-        const wsOptions = {
+        // 生成连接 ID
+        const connectionId = Math.random().toString(36).substr(2);
+        
+        // 构造 WebSocket URL
+        const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=${connectionId}`;
+
+        const ws = new WebSocket(wsUrl, {
           headers: {
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache',
-            'Connection': 'Upgrade',
-            'Host': 'speech.platform.bing.com',
             'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-            'Pragma': 'no-cache',
-            'Sec-WebSocket-Extensions': 'permessage-deflate; client_max_window_bits',
-            'Sec-WebSocket-Key': 'AuFNfR4/DISJ4PTTF2wVLA==',
-            'Sec-WebSocket-Version': '13',
-            'Upgrade': 'websocket',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36 Edg/91.0.864.41'
           }
-        };
+        });
 
-        const ws = new WebSocket('wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1', wsOptions);
-
-        ws.on('open', () => {
+        ws.onopen = () => {
+          console.log('WebSocket 连接已建立');
+          
           // 发送配置消息
-          ws.send(JSON.stringify({
+          const configMessage = {
             context: {
               synthesis: {
                 audio: {
@@ -59,36 +54,53 @@ export async function POST(request: Request) {
                 }
               }
             }
-          }));
+          };
+
+          ws.send(JSON.stringify(configMessage));
 
           // 发送SSML消息
-          ws.send(JSON.stringify({
+          const ssmlMessage = {
             ssml: `
               <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
                 <voice name="${voice}">
                   ${text}
                 </voice>
               </speak>
-            `
-          }));
-        });
+            `,
+            type: 'ssml'
+          };
 
-        ws.on('message', (data: Buffer) => {
+          ws.send(JSON.stringify(ssmlMessage));
+        };
+
+        ws.onmessage = (event) => {
+          const data = event.data as Buffer;
           // 检查是否是音频数据
-          if (data.indexOf('Path:audio') !== -1) {
+          if (data.includes('Path:audio')) {
             const audioStart = data.indexOf('\r\n\r\n') + 4;
             audioChunks.push(data.slice(audioStart));
           }
-        });
+        };
 
-        ws.on('close', () => {
-          resolve(Buffer.concat(audioChunks));
-        });
+        ws.onclose = () => {
+          console.log('WebSocket 连接已关闭');
+          if (audioChunks.length > 0) {
+            resolve(Buffer.concat(audioChunks));
+          } else {
+            reject(new Error('No audio data received'));
+          }
+        };
 
-        ws.on('error', (error) => {
+        ws.onerror = (error) => {
           console.error('WebSocket错误:', error);
           reject(error);
-        });
+        };
+
+        // 设置超时
+        setTimeout(() => {
+          ws.close();
+          reject(new Error('WebSocket connection timeout'));
+        }, 30000);
       });
 
       console.log('音频生成完成，数据大小:', audioData.length);
