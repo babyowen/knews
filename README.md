@@ -14,3 +14,7 @@ KNews 是一个基于关键词的新闻AI摘要系统。它可以根据用户选
 
 ### 1. 通过环境变量配置（推荐用于开发环境）
 在 `.env.local` 文件中添加 `NEXT_PUBLIC_KEYWORD_CATEGORIES` 变量：
+
+### 2. 通过数据库配置（推荐用于生产环境）
+其实应该在app/config/categories.ts中配置，然后通过环境变量加载。
+
