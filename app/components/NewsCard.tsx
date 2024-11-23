@@ -9,9 +9,10 @@ interface NewsCardProps {
   summary: string;
   keywords: string[];
   date: string;
+  references?: string;
 }
 
-const NewsCard: React.FC<NewsCardProps> = ({ title, url, summary, keywords, date }) => {
+const NewsCard: React.FC<NewsCardProps> = ({ title, url, summary, keywords, date, references }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const handlePlay = async (text: string) => {
@@ -30,6 +31,32 @@ const NewsCard: React.FC<NewsCardProps> = ({ title, url, summary, keywords, date
   const handleStop = () => {
     window.speechSynthesis.cancel();
     setIsPlaying(false);
+  };
+
+  const renderReferences = () => {
+    if (!references) return null;
+
+    const referenceList = references.split('\n').filter(ref => ref.trim());
+
+    return (
+      <div className="mt-4 pt-4 border-t border-gray-700/50">
+        <div className="text-xs text-gray-400 space-y-2">
+          {referenceList.map((ref, index) => (
+            <div key={index} className="flex items-start">
+              <span className="mr-2 text-gray-500">[{index + 1}]</span>
+              <a
+                href={ref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-300 transition-colors line-clamp-1"
+              >
+                {ref}
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -60,6 +87,8 @@ const NewsCard: React.FC<NewsCardProps> = ({ title, url, summary, keywords, date
       <div className="prose prose-invert max-w-none mb-4">
         <ReactMarkdown>{summary}</ReactMarkdown>
       </div>
+
+      {renderReferences()}
     </div>
   );
 };

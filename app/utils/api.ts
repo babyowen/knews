@@ -1,10 +1,4 @@
-import { FeishuRecord, FeishuResponse } from '@/app/types/feishu';
-
-interface NewsItem {
-  keyword: string;
-  summary: string;
-  date: string;
-}
+import { FeishuRecord, FeishuResponse, NewsItem } from '@/app/types/feishu';
 
 // 获取 tenant_access_token 的函数
 export async function getTenantAccessToken(appId: string, appSecret: string): Promise<string> {
@@ -125,11 +119,30 @@ export async function fetchNewsSummaries(
       return [];
     }
     
-    return data.data.items.map((item: FeishuRecord) => ({
-      keyword: item.fields.keyword || '',
-      summary: item.fields.summary || '',
-      date: item.fields.update || '',
-    }));
+    const summaries = data.data.items.map((item: any) => {
+      if (!item || !item.fields) {
+        console.warn('Invalid item received:', item);
+        return null;
+      }
+
+      const fields = item.fields;
+      
+      // 确保所有必需字段都存在
+      if (!fields.keyword || !fields.summary || !fields.date) {
+        console.warn('Missing required fields:', fields);
+        return null;
+      }
+
+      return {
+        keyword: fields.keyword,
+        summary: fields.summary,
+        date: fields.date,
+        references: fields.references || ''
+      };
+    }).filter((item): item is NewsItem => item !== null);
+
+    console.log("Processed summaries:", summaries);
+    return summaries;
   } catch (error) {
     console.error("Error in fetchNewsSummaries:", error);
     throw error;

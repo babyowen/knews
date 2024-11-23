@@ -12,6 +12,7 @@ interface NewsItem {
   keyword: string;
   summary: string;
   date: string;
+  references?: string;
 }
 
 export default function Home() {
@@ -392,6 +393,7 @@ export default function Home() {
                     summary={item.summary}
                     keywords={[item.keyword]}
                     date={formattedDate}
+                    references={item.references}
                   />
                 );
               })}
