@@ -1,15 +1,16 @@
 import { CategoryMap, KeywordCategory } from '../types/keywords';
+import { DEFAULT_CATEGORIES } from '../config/categories';
 
 // 从环境变量解析分类配置
 export function parseCategoryConfig(): CategoryMap {
   const categoryConfig = process.env.NEXT_PUBLIC_KEYWORD_CATEGORIES;
-  if (!categoryConfig) return {};
+  if (!categoryConfig) return DEFAULT_CATEGORIES;
 
   try {
     return JSON.parse(categoryConfig);
   } catch (error) {
     console.error('Failed to parse keyword categories:', error);
-    return {};
+    return DEFAULT_CATEGORIES;
   }
 }
 
