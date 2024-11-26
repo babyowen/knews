@@ -11,9 +11,24 @@ interface NewsCardProps {
   date: string;
 }
 
+/**
+ * NewsCard组件 - 用于显示单条新闻信息的卡片组件
+ * 
+ * @component
+ * @param {NewsCardProps} props - 组件属性
+ * @param {string} props.title - 新闻标题
+ * @param {string} props.url - 新闻链接
+ * @param {string} props.summary - 新闻摘要
+ * @param {string[]} props.keywords - 关键词数组
+ * @param {string} props.date - 新闻日期
+ */
 const NewsCard: React.FC<NewsCardProps> = ({ title, url, summary, keywords, date }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
+  /**
+   * 处理播放按钮点击事件
+   * @param {string} text - 要播放的文本内容
+   */
   const handlePlay = async (text: string) => {
     console.log('开始播放音频，文本内容:', text.substring(0, 100) + '...');
     try {
@@ -27,6 +42,9 @@ const NewsCard: React.FC<NewsCardProps> = ({ title, url, summary, keywords, date
     }
   };
 
+  /**
+   * 处理停止播放按钮点击事件
+   */
   const handleStop = () => {
     window.speechSynthesis.cancel();
     setIsPlaying(false);
