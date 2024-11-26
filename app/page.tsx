@@ -27,6 +27,7 @@ export default function Home() {
   const [isLoadingSummaries, setIsLoadingSummaries] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const [tenantAccessToken, setTenantAccessToken] = useState<string>('');
 
   useEffect(() => {
     console.log("Environment variables status:", {
@@ -52,11 +53,12 @@ export default function Home() {
       if (appId && appSecret && appToken && tableId) {
         try {
           console.log("Starting to fetch tenant access token...");
-          const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
-          console.log("Got tenant access token:", tenantAccessToken.substring(0, 4) + "****");
+          const token = await getTenantAccessToken(appId, appSecret);
+          setTenantAccessToken(token);
+          console.log("Got tenant access token:", token.substring(0, 4) + "****");
           
           console.log("Starting to fetch keywords...");
-          const fetchedKeywords = await fetchKeywords(tenantAccessToken, appToken, tableId);
+          const fetchedKeywords = await fetchKeywords(token, appToken, tableId);
           console.log("Fetched keywords:", fetchedKeywords);
           
           if (Array.isArray(fetchedKeywords) && fetchedKeywords.length > 0) {
@@ -392,6 +394,7 @@ export default function Home() {
                     summary={item.summary}
                     keywords={[item.keyword]}
                     date={formattedDate}
+                    tenantAccessToken={tenantAccessToken}
                   />
                 );
               })}

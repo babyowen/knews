@@ -1,5 +1,20 @@
 // 创建新文件定义飞书相关类型
-export interface FeishuRecord {
+export interface BaseFeishuRecord {
+  fields: {
+    [key: string]: any;
+  };
+}
+
+export interface NewsFeishuRecord extends BaseFeishuRecord {
+  fields: {
+    title: string;
+    link: string;
+    date?: string;
+    keyword?: string;
+  };
+}
+
+export interface SummaryFeishuRecord extends BaseFeishuRecord {
   fields: {
     keyword: string;
     summary?: string;
@@ -12,6 +27,6 @@ export interface FeishuResponse {
   code: number;
   msg: string;
   data?: {
-    items: FeishuRecord[];
+    items: BaseFeishuRecord[];
   };
 } 
