@@ -16,11 +16,15 @@ interface NewsItem {
 }
 
 export default function Home() {
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+  const getYesterday = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
     return yesterday;
-  });
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getYesterday());
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -385,8 +389,12 @@ export default function Home() {
                 type="date"
                 ref={dateInputRef}
                 className="w-full bg-gray-800 text-white border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={selectedDate.toISOString().split("T")[0]}
-                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                value={selectedDate.toISOString().split('T')[0]}
+                onChange={(e) => {
+                  const newDate = new Date(e.target.value);
+                  newDate.setHours(0, 0, 0, 0);
+                  setSelectedDate(newDate);
+                }}
               />
               <CalendarDaysIcon className="h-5 w-5 text-blue-400 cursor-pointer" />
             </div>
