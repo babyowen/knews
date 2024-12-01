@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { CalendarDaysIcon, MagnifyingGlassIcon, NewspaperIcon } from "@heroicons/react/24/outline";
-import { getTenantAccessToken, fetchKeywords, fetchNewsSummaries } from './utils/api';
+import { getTenantAccessToken, fetchKeywords, fetchNewsSummaries, fetchOriginalNews } from './utils/api';
 import ReactMarkdown from 'react-markdown';
 import NewsCard from './components/NewsCard';
 import { categorizeKeywords } from './utils/keywordUtils';
@@ -12,6 +12,7 @@ interface NewsItem {
   keyword: string;
   summary: string;
   date: string;
+  originalNews: NewsContent[];
 }
 
 export default function Home() {
@@ -33,30 +34,38 @@ export default function Home() {
       APP_ID: process.env.NEXT_PUBLIC_APP_ID ? "exists" : "missing",
       APP_SECRET: process.env.NEXT_PUBLIC_APP_SECRET ? "exists" : "missing",
       APP_TOKEN: process.env.NEXT_PUBLIC_APP_TOKEN ? "exists" : "missing",
-      TABLE_ID: process.env.NEXT_PUBLIC_TABLE_ID ? "exists" : "missing",
+      SUMMARY_TABLE_ID: process.env.NEXT_PUBLIC_SUMMARY_TABLE_ID ? "exists" : "missing",
+      SUMMARY_VIEW_ID: process.env.NEXT_PUBLIC_SUMMARY_VIEW_ID ? "exists" : "missing",
     });
     
     async function loadKeywords() {
       const appId = process.env.NEXT_PUBLIC_APP_ID;
       const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
       const appToken = process.env.NEXT_PUBLIC_APP_TOKEN;
-      const tableId = process.env.NEXT_PUBLIC_TABLE_ID;
+      const summaryTableId = process.env.NEXT_PUBLIC_SUMMARY_TABLE_ID;
+      const summaryViewId = process.env.NEXT_PUBLIC_SUMMARY_VIEW_ID;
 
       console.log("Environment variables check:", {
         appId: appId ? `${appId.substring(0, 4)}...` : 'missing',
         appSecret: appSecret ? `${appSecret.substring(0, 4)}...` : 'missing',
         appToken: appToken ? `${appToken.substring(0, 4)}...` : 'missing',
-        tableId: tableId || 'missing'
+        summaryTableId: summaryTableId || 'missing',
+        summaryViewId: summaryViewId || 'missing'
       });
 
-      if (appId && appSecret && appToken && tableId) {
+      if (appId && appSecret && appToken && summaryTableId && summaryViewId) {
         try {
           console.log("Starting to fetch tenant access token...");
           const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
           console.log("Got tenant access token:", tenantAccessToken.substring(0, 4) + "****");
           
           console.log("Starting to fetch keywords...");
-          const fetchedKeywords = await fetchKeywords(tenantAccessToken, appToken, tableId);
+          const fetchedKeywords = await fetchKeywords(
+            tenantAccessToken, 
+            appToken, 
+            summaryTableId,
+            summaryViewId
+          );
           console.log("Fetched keywords:", fetchedKeywords);
           
           if (Array.isArray(fetchedKeywords) && fetchedKeywords.length > 0) {
@@ -102,34 +111,96 @@ export default function Home() {
       return;
     }
 
+    console.log('handleSearch called with:', {
+      date: selectedDate.toISOString().split('T')[0],
+      selectedKeywords
+    });
+
     setIsLoadingSummaries(true);
     setHasSearched(true);
     try {
       const appId = process.env.NEXT_PUBLIC_APP_ID;
       const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
       const appToken = process.env.NEXT_PUBLIC_APP_TOKEN;
-      const tableId = process.env.NEXT_PUBLIC_TABLE_ID;
+      const summaryTableId = process.env.NEXT_PUBLIC_SUMMARY_TABLE_ID;
+      const summaryViewId = process.env.NEXT_PUBLIC_SUMMARY_VIEW_ID;
+      const newsTableId = process.env.NEXT_PUBLIC_NEWS_TABLE_ID;
+      const newsViewId = process.env.NEXT_PUBLIC_NEWS_VIEW_ID;
 
-      if (appId && appSecret && appToken && tableId) {
-        const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
-        const fetchedSummaries = await fetchNewsSummaries(
+      console.log('Environment variables loaded:', {
+        appId: appId ? 'exists' : 'missing',
+        appSecret: appSecret ? 'exists' : 'missing',
+        appToken: appToken ? 'exists' : 'missing',
+        summaryTableId,
+        summaryViewId,
+        newsTableId,
+        newsViewId
+      });
+
+      if (!appId || !appSecret || !appToken || !summaryTableId || !summaryViewId || !newsTableId || !newsViewId) {
+        throw new Error('Missing required environment variables');
+      }
+
+      const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
+      console.log('Got tenant access token');
+      
+      // 并行获取摘要和原始新闻
+      const [summaries, originalNews] = await Promise.all([
+        fetchNewsSummaries(
           tenantAccessToken,
           appToken,
-          tableId,
+          summaryTableId,
+          summaryViewId,
           selectedDate.toISOString().split('T')[0],
           selectedKeywords
+        ),
+        fetchOriginalNews(
+          tenantAccessToken,
+          appToken,
+          newsTableId,
+          newsViewId,
+          selectedDate.toISOString().split('T')[0],
+          selectedKeywords
+        )
+      ]);
+
+      console.log('Fetched data:', {
+        summariesCount: summaries.length,
+        originalNewsCount: originalNews.length
+      });
+
+      // 将原始新闻与摘要匹配
+      const combinedResults = summaries.map(summary => {
+        const matchingNews = originalNews.filter(
+          news => news.keyword === summary.keyword && news.date === summary.date
         );
+        
+        return {
+          ...summary,
+          originalNews: matchingNews
+        };
+      });
 
-        const orderedSummaries = [...fetchedSummaries].sort((a, b) => {
-          const indexA = selectedKeywords.indexOf(a.keyword);
-          const indexB = selectedKeywords.indexOf(b.keyword);
-          return indexA - indexB;
-        });
+      // 按照选择的关键词顺序排序
+      const orderedResults = [...combinedResults].sort((a, b) => {
+        const indexA = selectedKeywords.indexOf(a.keyword);
+        const indexB = selectedKeywords.indexOf(b.keyword);
+        return indexA - indexB;
+      });
 
-        setSummaries(orderedSummaries);
-      }
+      console.log('Final results with original news:', orderedResults.map(r => ({
+        keyword: r.keyword,
+        originalNewsCount: r.originalNews.length,
+        originalNewsTitles: r.originalNews.map(n => n.title)
+      })));
+
+      setSummaries(orderedResults);
     } catch (error) {
-      console.error("Error fetching summaries:", error);
+      console.error('Error in handleSearch:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       setSummaries([]);
     } finally {
       setIsLoadingSummaries(false);
@@ -387,11 +458,10 @@ export default function Home() {
                 return (
                   <NewsCard
                     key={index}
-                    title={item.keyword}
-                    url=""
+                    keyword={item.keyword}
                     summary={item.summary}
-                    keywords={[item.keyword]}
                     date={formattedDate}
+                    originalNews={item.originalNews}
                   />
                 );
               })}
