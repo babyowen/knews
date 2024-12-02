@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import NewsCard from './components/NewsCard';
 import { categorizeKeywords } from './utils/keywordUtils';
 import { KeywordCategory } from './types/keywords';
+import { NewsContent } from './types/news';
 
 interface NewsItem {
   keyword: string;
@@ -17,11 +18,21 @@ interface NewsItem {
 
 export default function Home() {
   const getYesterday = () => {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
+    // 获取当前的中国时间
+    const chinaDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+    const yesterday = new Date(chinaDate);
+    yesterday.setDate(chinaDate.getDate() - 1);
     yesterday.setHours(0, 0, 0, 0);
-    return yesterday;
+    
+    // 转换为 ISO 字符串并提取日期部分
+    const isoString = yesterday.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'Asia/Shanghai'
+    }).split('/').join('-');
+    
+    return new Date(isoString);
   };
 
   const [selectedDate, setSelectedDate] = useState(getYesterday());
@@ -101,6 +112,10 @@ export default function Home() {
     }
 
     loadKeywords();
+  }, []);
+
+  useEffect(() => {
+    setSelectedDate(getYesterday());
   }, []);
 
   const handleDateClick = () => {
@@ -389,8 +404,8 @@ export default function Home() {
                 type="date"
                 ref={dateInputRef}
                 className="w-full bg-gray-800 text-white border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={selectedDate.toISOString().split('T')[0]}
-                onChange={(e) => {
+                defaultValue={getYesterday().toISOString().split('T')[0]}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
                   const newDate = new Date(e.target.value);
                   newDate.setHours(0, 0, 0, 0);
                   setSelectedDate(newDate);
