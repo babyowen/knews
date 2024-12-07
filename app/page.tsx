@@ -8,6 +8,7 @@ import NewsCard from './components/NewsCard';
 import { categorizeKeywords } from './utils/keywordUtils';
 import { KeywordCategory } from './types/keywords';
 import { NewsContent } from './types/news';
+import NoNewsAlert from './components/NoNewsAlert';
 
 interface NewsItem {
   keyword: string;
@@ -43,6 +44,7 @@ export default function Home() {
   const [isLoadingSummaries, setIsLoadingSummaries] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const [noNewsKeywords, setNoNewsKeywords] = useState<string[]>([]);
 
   useEffect(() => {
     console.log("Environment variables status:", {
@@ -183,11 +185,15 @@ export default function Home() {
         )
       ]);
 
-      console.log('Fetched data:', {
-        summariesCount: summaries.length,
-        originalNewsCount: originalNews.length
-      });
+      // 找出哪些关键词没有新闻
+      const keywordsWithNews = new Set(summaries.map(s => s.keyword));
+      const missingKeywords = selectedKeywords.filter(k => !keywordsWithNews.has(k));
+      setNoNewsKeywords(missingKeywords);
 
+      // 获取分类后的关键词顺序
+      const categories = categorizeKeywords(keywords);
+      const orderedKeywords = categories.flatMap(category => category.keywords);
+      
       // 将原始新闻与摘要匹配
       const combinedResults = summaries.map(summary => {
         const matchingNews = originalNews.filter(
@@ -200,27 +206,18 @@ export default function Home() {
         };
       });
 
-      // 按照选择的关键词顺序排序
+      // 按照分类后的关键词顺序排序
       const orderedResults = [...combinedResults].sort((a, b) => {
-        const indexA = selectedKeywords.indexOf(a.keyword);
-        const indexB = selectedKeywords.indexOf(b.keyword);
+        const indexA = orderedKeywords.indexOf(a.keyword);
+        const indexB = orderedKeywords.indexOf(b.keyword);
         return indexA - indexB;
       });
 
-      console.log('Final results with original news:', orderedResults.map(r => ({
-        keyword: r.keyword,
-        originalNewsCount: r.originalNews.length,
-        originalNewsTitles: r.originalNews.map(n => n.title)
-      })));
-
       setSummaries(orderedResults);
     } catch (error) {
-      console.error('Error in handleSearch:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      console.error('Error in handleSearch:', error);
       setSummaries([]);
+      setNoNewsKeywords([]); // 发生错误时清空无新闻关键词
     } finally {
       setIsLoadingSummaries(false);
     }
@@ -416,9 +413,57 @@ export default function Home() {
           </div>
 
           <div className="mb-4">
-            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2 text-purple-400">
-              <NewspaperIcon className="h-5 w-5" /> 选择关键词
-            </h2>
+            <div className="flex items-center gap-3 mb-3">
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-purple-400">
+                <NewspaperIcon className="h-5 w-5" /> 选择关键词
+              </h2>
+              <button
+                onClick={() => {
+                  if (selectedKeywords.length === keywords.length) {
+                    setSelectedKeywords([]);
+                  } else {
+                    setSelectedKeywords([...keywords]);
+                  }
+                }}
+                className={`
+                  px-2.5 py-0.5 text-xs rounded-md
+                  transition-all duration-300
+                  flex items-center gap-1.5
+                  border
+                  ${selectedKeywords.length === keywords.length
+                    ? 'bg-gradient-to-r from-purple-500/80 to-blue-500/80 text-white border-purple-400/30 hover:from-purple-600/80 hover:to-blue-600/80'
+                    : 'bg-gradient-to-r from-gray-700/50 to-gray-600/50 text-gray-200 border-gray-600/30 hover:from-purple-500/50 hover:to-blue-500/50'
+                  }
+                  hover:shadow-lg hover:shadow-purple-500/10
+                  hover:scale-105
+                  active:scale-95
+                `}
+              >
+                <svg 
+                  className={`
+                    w-3 h-3
+                    ${selectedKeywords.length === keywords.length
+                      ? 'text-red-200'
+                      : 'text-blue-200'
+                    }
+                  `}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d={selectedKeywords.length === keywords.length
+                      ? "M6 18L18 6M6 6l12 12"
+                      : "M4 9l7 7 9-13"
+                    }
+                  />
+                </svg>
+                {selectedKeywords.length === keywords.length ? '清空' : '全选'}
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {renderKeywords()}
             </div>
@@ -488,6 +533,18 @@ export default function Home() {
                   />
                 );
               })}
+              
+              {/* 添加无新闻关键词提示 */}
+              {noNewsKeywords.length > 0 && (
+                <NoNewsAlert 
+                  keywords={noNewsKeywords} 
+                  date={selectedDate.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                  })} 
+                />
+              )}
             </div>
           ) : hasSearched ? (
             <div className="flex flex-col items-center justify-center text-gray-400 p-8">
