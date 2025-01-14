@@ -9,8 +9,10 @@ interface NewsItem {
 
 // 获取 tenant_access_token 的函数
 export async function getTenantAccessToken(appId: string, appSecret: string): Promise<string> {
-  console.log("Starting to fetch tenant access token...");
   try {
+    console.log('ℹ️ 系统初始化中...');
+    console.log('正在请求 Token...');
+    
     const response = await fetch('/api/feishu', {
       method: 'POST',
       headers: {
@@ -30,16 +32,18 @@ export async function getTenantAccessToken(appId: string, appSecret: string): Pr
     }
 
     const data = await response.json();
-    console.log("Tenant access token response:", data);
+    console.log('Token API 响应:', JSON.stringify(data, null, 2));
     
-    if (!data.tenant_access_token) {
-      throw new Error('No tenant_access_token in response');
+    if (data.code === 0) {
+      console.log('✓ 权限验证成功');
+      return data.tenant_access_token;
+    } else {
+      throw new Error(`权限验证失败: ${data.msg || '未知错误'} (错误码: ${data.code})`);
     }
-    
-    return data.tenant_access_token;
   } catch (error) {
-    if (error instanceof Error) {
-      console.error("Detailed error in getTenantAccessToken:", error.message);
+    console.error('✗ 系统初始化失败:', error instanceof Error ? error.message : '未知错误');
+    if (error instanceof Error && error.stack) {
+      console.error('错误堆栈:', error.stack);
     }
     throw error;
   }
@@ -52,8 +56,8 @@ export async function fetchKeywords(
   summaryTableId: string,
   summaryViewId: string
 ): Promise<string[]> {
-  console.log("Starting to fetch keywords...");
   try {
+    console.log('ℹ️ 正在获取数据...');
     const response = await fetch('/api/feishu', {
       method: 'POST',
       headers: {
@@ -88,9 +92,7 @@ export async function fetchKeywords(
     console.log("Unique keywords:", uniqueKeywords);
     return uniqueKeywords;
   } catch (error) {
-    if (error instanceof Error) {
-      console.error("Detailed error in fetchKeywords:", error.message);
-    }
+    console.error('✗ 数据获取失败');
     throw error;
   }
 }
