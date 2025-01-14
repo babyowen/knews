@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
   images: {
-    domains: ['localhost'],
+    domains: ['open.feishu.cn'],
   },
   async headers() {
     return [
@@ -13,20 +11,22 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: [
-              "default-src 'self' https://open.feishu.cn https://api.moonshot.cn",
+              "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data:",
-              "font-src 'self' data:",
-              "connect-src 'self' https://open.feishu.cn https://api.moonshot.cn",
+              "font-src 'self' data: https://fonts.gstatic.com",
+              "img-src 'self' data: https:",
+              "connect-src 'self' https://nls-gateway-cn-shanghai.aliyuncs.com wss://nls-gateway-cn-shanghai.aliyuncs.com https://nls-meta.cn-shanghai.aliyuncs.com",
+              "worker-src 'self' blob:",
+              "child-src 'self' blob:",
+              "frame-src 'self'",
               "media-src 'self' blob:",
-              "worker-src 'self' blob:"
             ].join('; ')
           }
-        ],
+        ]
       }
-    ];
+    ]
   }
-};
+}
 
-module.exports = nextConfig; 
+module.exports = nextConfig 
