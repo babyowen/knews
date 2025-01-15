@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { NewsContent } from '../types/news';
 import { TTSPlayer } from '../utils/speechSynthesis';
@@ -20,7 +20,6 @@ export default function NewsCard({
   const [showOriginal, setShowOriginal] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [ttsPlayer, setTtsPlayer] = useState<TTSPlayer | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     try {
@@ -30,29 +29,21 @@ export default function NewsCard({
       console.error('播放器初始化失败');
     }
 
-    // 创建音频元素
-    const audio = new Audio();
-    audio.addEventListener('ended', () => setIsPlaying(false));
-    audio.addEventListener('error', () => console.error('播放失败'));
-    audioRef.current = audio;
-
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      if (ttsPlayer) {
+        ttsPlayer.stop();
       }
     };
   }, []);
 
   const handlePlayClick = async () => {
-    if (!ttsPlayer || !audioRef.current) {
+    if (!ttsPlayer) {
       return;
     }
 
     try {
       if (isPlaying) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+        ttsPlayer.stop();
         setIsPlaying(false);
       } else {
         setIsPlaying(true);
@@ -65,19 +56,16 @@ export default function NewsCard({
           .replace(/\n+/g, ' ')
           .trim();
         
-        // 获取音频 URL
-        const audioBlob = await ttsPlayer.synthesize(cleanText);
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // 播放音频
-        audioRef.current.src = audioUrl;
         try {
-          await audioRef.current.play();
+          await ttsPlayer.synthesizeAndPlay(cleanText);
+          setIsPlaying(false);
         } catch (error) {
+          console.error('播放失败:', error);
           setIsPlaying(false);
         }
       }
     } catch (error) {
+      console.error('播放处理失败:', error);
       setIsPlaying(false);
     }
   };
