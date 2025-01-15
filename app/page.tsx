@@ -47,65 +47,48 @@ export default function Home() {
   const [noNewsKeywords, setNoNewsKeywords] = useState<string[]>([]);
 
   useEffect(() => {
-    // 检查环境变量是否都存在
-    const envVars = [
-      'NEXT_PUBLIC_APP_ID',
-      'NEXT_PUBLIC_APP_SECRET',
-      'NEXT_PUBLIC_APP_TOKEN',
-      'NEXT_PUBLIC_SUMMARY_TABLE_ID',
-      'NEXT_PUBLIC_SUMMARY_VIEW_ID'
-    ];
-    
-    const missingVars = envVars.filter(varName => !process.env[varName]);
-    if (missingVars.length > 0) {
-      console.warn('⚠️ 环境变量检查：部分变量未定义，但不影响基本功能');
-    } else {
-      console.log('✓ 环境变量检查通过');
-    }
-    
-    async function loadKeywords() {
-      const appId = process.env.NEXT_PUBLIC_APP_ID;
-      const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
-      const appToken = process.env.NEXT_PUBLIC_APP_TOKEN;
-      const summaryTableId = process.env.NEXT_PUBLIC_SUMMARY_TABLE_ID;
-      const summaryViewId = process.env.NEXT_PUBLIC_SUMMARY_VIEW_ID;
+    const checkEnv = () => {
+      const missingVars = [];
+      if (!process.env.NEXT_PUBLIC_APP_ID) missingVars.push('APP_ID');
+      if (!process.env.NEXT_PUBLIC_APP_SECRET) missingVars.push('APP_SECRET');
+      if (!process.env.NEXT_PUBLIC_APP_TOKEN) missingVars.push('APP_TOKEN');
+      
+      if (missingVars.length > 0) {
+        console.warn('⚠️ 部分配置未完成，但不影响基本功能');
+      }
+    };
 
-      if (appId && appSecret && appToken && summaryTableId && summaryViewId) {
-        try {
-          console.log('⏳ 正在初始化系统...');
-          const tenantAccessToken = await getTenantAccessToken(appId, appSecret);
-          console.log('✓ 系统初始化完成');
-          
-          console.log('⏳ 正在加载数据...');
-          const fetchedKeywords = await fetchKeywords(
-            tenantAccessToken, 
-            appToken, 
-            summaryTableId,
-            summaryViewId
-          );
-          
-          if (Array.isArray(fetchedKeywords) && fetchedKeywords.length > 0) {
-            const sortedKeywords = [...fetchedKeywords].sort();
-            setKeywords(sortedKeywords);
-            console.log(`✓ 数据加载完成，共 ${sortedKeywords.length} 个关键词`);
-          } else {
-            console.warn('⚠️ 暂无可用数据');
-            setKeywords([]);
-          }
-        } catch (error) {
-          console.error('✗ 数据加载失败');
-          setKeywords([]);
-        } finally {
-          setIsLoading(false);
+    const initSystem = async () => {
+      try {
+        console.info('系统初始化中...');
+        const appId = process.env.NEXT_PUBLIC_APP_ID;
+        const appSecret = process.env.NEXT_PUBLIC_APP_SECRET;
+        const appToken = process.env.NEXT_PUBLIC_APP_TOKEN;
+        const tableId = process.env.NEXT_PUBLIC_SUMMARY_TABLE_ID;
+        const viewId = process.env.NEXT_PUBLIC_SUMMARY_VIEW_ID;
+
+        if (!appId || !appSecret || !appToken || !tableId || !viewId) {
+          throw new Error('环境变量配置不完整');
         }
-      } else {
-        console.warn('⚠️ 配置检查未通过，部分功能可能受限');
-        setKeywords([]);
+
+        const token = await getTenantAccessToken(appId, appSecret);
+        console.info('系统初始化完成');
+        
+        console.info('正在加载数据...');
+        const keywordList = await fetchKeywords(token, appToken, tableId, viewId);
+        if (keywordList.length > 0) {
+          setKeywords(keywordList);
+          console.info(`数据加载完成`);
+        }
+      } catch (error) {
+        console.error('系统初始化失败');
+      } finally {
         setIsLoading(false);
       }
-    }
+    };
 
-    loadKeywords();
+    checkEnv();
+    initSystem();
   }, []);
 
   useEffect(() => {

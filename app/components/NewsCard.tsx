@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { NewsContent } from '../types/news';
 import { TTSPlayer } from '../utils/speechSynthesis';
@@ -20,48 +20,64 @@ export default function NewsCard({
   const [showOriginal, setShowOriginal] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [ttsPlayer, setTtsPlayer] = useState<TTSPlayer | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    console.log('NewsCard - 创建 TTSPlayer 实例');
     try {
       const player = new TTSPlayer();
       setTtsPlayer(player);
-      console.log('NewsCard - TTSPlayer 实例创建成功');
     } catch (error) {
-      console.error('NewsCard - TTSPlayer 实例创建失败:', error);
+      console.error('播放器初始化失败');
     }
+
+    // 创建音频元素
+    const audio = new Audio();
+    audio.addEventListener('ended', () => setIsPlaying(false));
+    audio.addEventListener('error', () => console.error('播放失败'));
+    audioRef.current = audio;
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
   }, []);
 
   const handlePlayClick = async () => {
-    console.log('NewsCard - 播放按钮被点击');
-    if (!ttsPlayer) {
-      console.error('NewsCard - TTSPlayer 实例不存在');
+    if (!ttsPlayer || !audioRef.current) {
       return;
     }
 
     try {
       if (isPlaying) {
-        console.log('NewsCard - 停止当前播放');
-        ttsPlayer.stop();
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
         setIsPlaying(false);
       } else {
-        console.log('NewsCard - 开始播放新内容, 文本长度:', summary.length);
         setIsPlaying(true);
         
         // 清理 Markdown 标记
         const cleanText = summary
-          .replace(/#{1,6}\s/g, '') // 移除标题标记
-          .replace(/\*\*/g, '') // 移除加粗标记
-          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // 移除链接，保留文本
-          .replace(/\n+/g, ' ') // 将多个换行替换为空格
+          .replace(/#{1,6}\s/g, '')
+          .replace(/\*\*/g, '')
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+          .replace(/\n+/g, ' ')
           .trim();
         
-        console.log('NewsCard - 清理后的文本长度:', cleanText.length);
-        await ttsPlayer.synthesizeAndPlay(cleanText);
+        // 获取音频 URL
+        const audioBlob = await ttsPlayer.synthesize(cleanText);
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // 播放音频
+        audioRef.current.src = audioUrl;
+        try {
+          await audioRef.current.play();
+        } catch (error) {
+          setIsPlaying(false);
+        }
       }
     } catch (error) {
-      console.error('NewsCard - 播放过程出错:', error);
-    } finally {
       setIsPlaying(false);
     }
   };
@@ -73,13 +89,13 @@ export default function NewsCard({
           <h3 className="text-lg font-semibold text-blue-400">{keyword}</h3>
           <button
             onClick={handlePlayClick}
-            className="p-1 rounded-full hover:bg-gray-700 transition-colors"
+            className="p-2 rounded-full hover:bg-gray-700 transition-colors"
             title={isPlaying ? '停止播放' : '播放摘要'}
           >
             {isPlaying ? (
-              <SpeakerXMarkIcon className="h-5 w-5 text-blue-400" />
+              <SpeakerXMarkIcon className="h-6 w-6 text-blue-400" />
             ) : (
-              <SpeakerWaveIcon className="h-5 w-5 text-gray-400 hover:text-blue-400" />
+              <SpeakerWaveIcon className="h-6 w-6 text-gray-400 hover:text-blue-400" />
             )}
           </button>
         </div>

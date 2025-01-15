@@ -3,6 +3,15 @@ const nextConfig = {
   images: {
     domains: ['open.feishu.cn'],
   },
+  env: {
+    NEXT_PUBLIC_APP_ID: process.env.NEXT_PUBLIC_APP_ID,
+    NEXT_PUBLIC_APP_SECRET: process.env.NEXT_PUBLIC_APP_SECRET,
+    NEXT_PUBLIC_APP_TOKEN: process.env.NEXT_PUBLIC_APP_TOKEN,
+    NEXT_PUBLIC_SUMMARY_TABLE_ID: process.env.NEXT_PUBLIC_SUMMARY_TABLE_ID,
+    NEXT_PUBLIC_SUMMARY_VIEW_ID: process.env.NEXT_PUBLIC_SUMMARY_VIEW_ID,
+    NEXT_PUBLIC_NEWS_TABLE_ID: process.env.NEXT_PUBLIC_NEWS_TABLE_ID,
+    NEXT_PUBLIC_NEWS_VIEW_ID: process.env.NEXT_PUBLIC_NEWS_VIEW_ID,
+  },
   async headers() {
     return [
       {
