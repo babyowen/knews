@@ -1,15 +1,26 @@
 export class TTSPlayer {
-  private audioContext: AudioContext;
-  private currentSource: AudioBufferSourceNode | null = null;
+  private audioContext: AudioContext | null = null;
+  private audioElement: HTMLAudioElement | null = null;
   private readonly MAX_TEXT_LENGTH = 300;
   private isPlaying = false;
   private currentToken: string | null = null;
   private textChunks: string[] = [];
   private currentChunkIndex = 0;
+  private isMobile: boolean;
 
   constructor() {
+    // 检测是否为移动设备
+    this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
     try {
-      this.audioContext = new AudioContext();
+      // 在PC端使用 AudioContext，移动端使用 Audio 元素
+      if (!this.isMobile) {
+        this.audioContext = new AudioContext();
+      }
+      this.audioElement = new Audio();
+      this.audioElement.addEventListener('ended', () => {
+        this.playNext();
+      });
     } catch (error) {
       throw new Error('音频初始化失败');
     }
@@ -93,7 +104,7 @@ export class TTSPlayer {
     return chunks;
   }
 
-  private async synthesizeChunk(text: string): Promise<AudioBuffer> {
+  private async synthesizeChunk(text: string): Promise<Blob> {
     try {
       const token = await this.getToken();
       const response = await fetch('/api/aliyun/tts', {
@@ -108,32 +119,49 @@ export class TTSPlayer {
         throw new Error('语音合成失败');
       }
 
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      return await this.audioContext.decodeAudioData(arrayBuffer);
+      return await response.blob();
     } catch (error) {
       throw error;
     }
   }
 
-  private async playChunk(audioBuffer: AudioBuffer): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
+  private async playNext(): Promise<void> {
+    if (!this.isPlaying || this.currentChunkIndex >= this.textChunks.length) {
+      this.isPlaying = false;
+      return;
+    }
+
+    try {
+      const chunk = this.textChunks[this.currentChunkIndex];
+      const audioBlob = await this.synthesizeChunk(chunk);
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      if (this.isMobile && this.audioElement) {
+        // 移动端使用 Audio 元素播放
+        this.audioElement.src = audioUrl;
+        await this.audioElement.play();
+      } else if (this.audioContext) {
+        // PC端使用 AudioContext 播放
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
         const source = this.audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(this.audioContext.destination);
-        
-        this.currentSource = source;
-        source.start(0);
-
         source.onended = () => {
-          this.currentSource = null;
-          resolve();
+          this.currentChunkIndex++;
+          this.playNext();
         };
-      } catch (error) {
-        reject(new Error('音频播放失败'));
+        source.start(0);
       }
-    });
+
+      // 如果是移动端，ended事件会触发playNext
+      if (!this.isMobile) {
+        this.currentChunkIndex++;
+      }
+    } catch (error) {
+      this.isPlaying = false;
+      throw error;
+    }
   }
 
   public async synthesizeAndPlay(text: string): Promise<void> {
@@ -144,31 +172,25 @@ export class TTSPlayer {
       this.currentChunkIndex = 0;
       this.textChunks = this.splitText(text);
 
-      // 开始流式播放
-      while (this.isPlaying && this.currentChunkIndex < this.textChunks.length) {
-        const chunk = this.textChunks[this.currentChunkIndex];
-        const audioBuffer = await this.synthesizeChunk(chunk);
-        await this.playChunk(audioBuffer);
-        this.currentChunkIndex++;
-      }
+      // 开始播放第一个片段
+      await this.playNext();
     } catch (error) {
       this.isPlaying = false;
       throw error;
-    } finally {
-      this.isPlaying = false;
     }
   }
 
   public stop(): void {
     this.isPlaying = false;
-    if (this.currentSource) {
-      try {
-        this.currentSource.stop();
-        this.currentSource.disconnect();
-        this.currentSource = null;
-      } catch (error) {
-        throw new Error('停止播放失败');
-      }
+    if (this.isMobile && this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement.currentTime = 0;
+    } else if (this.audioContext) {
+      // 断开所有连接
+      this.audioContext.close().then(() => {
+        this.audioContext = new AudioContext();
+      });
     }
+    this.currentChunkIndex = 0;
   }
 } 
