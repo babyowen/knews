@@ -21,7 +21,8 @@ export async function GET() {
         Action: 'CreateToken',
         Version: '2019-02-28',
         AccessKeyId: accessKeyId,
-        Format: 'JSON'
+        Format: 'JSON',
+        Timestamp: new Date().toISOString()
       }
     });
 
