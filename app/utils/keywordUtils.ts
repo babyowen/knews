@@ -37,15 +37,14 @@ export function categorizeKeywords(keywords: string[]): KeywordCategory[] {
 
   // 处理未分类的关键词
   const uncategorizedKeywords = keywords.filter(
-    keyword => !Array.from(usedKeywords).includes(keyword)
+    keyword => !usedKeywords.has(keyword)
   );
 
-  if (uncategorizedKeywords.length > 0) {
-    categorizedKeywords.push({
-      name: '未分类',
-      keywords: uncategorizedKeywords
-    });
-  }
+  // 始终添加未分类类别，即使没有未分类的关键词
+  categorizedKeywords.push({
+    name: '未分类',
+    keywords: uncategorizedKeywords
+  });
 
   return categorizedKeywords;
 } 

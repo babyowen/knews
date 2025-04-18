@@ -1,5 +1,6 @@
 import { FeishuRecord, FeishuResponse } from '@/app/types/feishu';
 import { NewsContent, NewsSummary } from '@/app/types/news';
+import { DEFAULT_CATEGORIES } from '../config/categories';
 
 interface NewsItem {
   keyword: string;
@@ -57,42 +58,19 @@ export async function fetchKeywords(
   summaryViewId: string
 ): Promise<string[]> {
   try {
-    console.log('ℹ️ 正在获取数据...');
-    const response = await fetch('/api/feishu', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        type: 'keywords',
-        token: tenantAccessToken,
-        appToken,
-        tableId: summaryTableId,
-        viewId: summaryViewId,
-        field_names: ["keyword"]
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API Error Response:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json() as FeishuResponse;
-    console.log("Keywords response:", data);
+    console.log('ℹ️ 正在获取预设关键词...');
     
-    if (!data.data?.items) {
-      throw new Error('No items found in response');
-    }
+    // 从DEFAULT_CATEGORIES中获取所有预设的关键词
+    const predefinedKeywords = Object.values(DEFAULT_CATEGORIES).flat();
+    console.log("预设的关键词列表:", predefinedKeywords);
     
-    // 从所有记录中提取关键词并去重
-    const keywords = data.data.items.map((item: FeishuRecord) => item.fields.keyword);
-    const uniqueKeywords = Array.from(new Set(keywords)) as string[];
-    console.log("Unique keywords:", uniqueKeywords);
+    // 去重
+    const uniqueKeywords = Array.from(new Set(predefinedKeywords));
+    console.log("去重后的关键词列表:", uniqueKeywords);
+    
     return uniqueKeywords;
   } catch (error) {
-    console.error('✗ 数据获取失败');
+    console.error('✗ 关键词获取失败');
     throw error;
   }
 }
