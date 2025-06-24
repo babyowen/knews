@@ -302,3 +302,44 @@ export async function fetchOriginalNews(
     throw error;
   }
 }
+
+export async function fetchWeeklySummaries(dateRange?: string, keyword?: string) {
+  try {
+    // 首先获取访问令牌
+    const tokenResponse = await fetch('/api/feishu', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'token',
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+    const token = tokenData.tenant_access_token;
+
+    // 使用访问令牌获取周度总结
+    const response = await fetch('/api/feishu', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'weeklySummaries',
+        token,
+        appToken: process.env.NEXT_PUBLIC_APP_TOKEN,
+        tableId: 'tblbMF39g6r9pyPR',
+        viewId: 'vew8bTGsPp',
+        dateRange,
+        keyword,
+      }),
+    });
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching weekly summaries:', error);
+    throw error;
+  }
+}

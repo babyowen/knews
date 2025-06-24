@@ -78,6 +78,48 @@ export async function POST(request: Request) {
       return NextResponse.json(result);
     }
 
+    if (type === 'weeklySummaries') {
+      const { token, appToken, tableId, viewId, dateRange, keyword } = data;
+      console.log("API Route - Querying weekly summaries:", { 
+        dateRange, 
+        keyword,
+        appToken: appToken.substring(0, 4) + "****",
+        tableId,
+        viewId
+      });
+      
+      let filter = "";
+      if (dateRange && keyword) {
+        filter = `AND(CurrentValue.[daterange]="${dateRange}",CurrentValue.[keyword]="${keyword}")`;
+      } else if (dateRange) {
+        filter = `CurrentValue.[daterange]="${dateRange}"`;
+      } else if (keyword) {
+        filter = `CurrentValue.[keyword]="${keyword}"`;
+      }
+
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records?view_id=${viewId}&filter=${encodeURIComponent(filter)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Route - Feishu API Error Response:", errorText);
+        throw new Error(`Feishu API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("API Route - Weekly summaries received:", result.data?.items?.length || 0);
+
+      return NextResponse.json(result);
+    }
+
     return NextResponse.json({ error: 'Invalid request type' }, { status: 400 });
   } catch (error) {
     console.error('API Route - Error:', error);
